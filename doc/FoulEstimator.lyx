@@ -1,0 +1,2802 @@
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 508
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\begin_preamble
+\include{preamble}
+\end_preamble
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+FRC Tech Foul Estimator
+\end_layout
+
+\begin_layout Author
+Jon Schutz, Pedare Robotics Mentor
+\end_layout
+
+\begin_layout Standard
+In each FRC round, two alliances of three teams each compete, and scores
+ are recorded for each alliance.
+\end_layout
+
+\begin_layout Standard
+The purpose of this analysis is to estimate the rate of tech fouls 
+\emph on
+per team
+\emph default
+ based on the data available 
+\emph on
+per alliance
+\emph default
+.
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Standard
+FRC scoring statistics are recorded against the alliance of three teams
+ rather than the individual team.
+ It is useful to be able to get an estimate of the contribution of each
+ team to the overall score, either to assess own-team performance, or to
+ help decide who to pick as an alliance partner.
+ Different methods are available for estimating the individual statistics;
+ here we look at three different methods to determine which one is likely
+ to give the best estimate of individual team tech fouls.
+\end_layout
+
+\begin_layout Standard
+The three methods considered are denoted ML, LS and MAP, which respectively
+ stand for Maximum Likelihood, Least Squares and Maximum A-Posteriori.
+ The details of each are given in an appendix.
+\end_layout
+
+\begin_layout Standard
+As the analysis will show, in a single competition there is not enough data
+ to generate accurate individual team estimates.
+ Having an estimate of the actual tech foul rates may not be the most important
+ thing, however; in fact a straight ranking of teams in order of best to
+ worst could be just as valuable in helping to gain an understanding of
+ where each team stands.
+\end_layout
+
+\begin_layout Standard
+Another consideration is that any team can have a good day or a bad day,
+ and the statistics on the day may not be a good reflection of a team's
+ real capacity.
+ If we think of each team as having some underlying performance distribution
+ (probability distribution), and that the scores at any given competition
+ are just samples from a random number generator with that distribution,
+ then from the data we have we can estimate the possible ranges for the
+ true underlying average.
+ The information that shows the difference between the on-the-day performance
+ and the true underlying performance is hidden in the variance of the data.
+\end_layout
+
+\begin_layout Standard
+In this analysis, the three estimation methods have been tested to find
+ out:
+\end_layout
+
+\begin_layout Itemize
+which is the best for estimating team scores for the on-the-day performance
+\end_layout
+
+\begin_layout Itemize
+which is the best for estimating team rankings for the on-the-day performance
+\end_layout
+
+\begin_layout Itemize
+which is the best for estimating team scores or team rankings for underlying
+ performance
+\end_layout
+
+\begin_layout Section
+Test Data
+\end_layout
+
+\begin_layout Standard
+To understand how well the estimators are working, some data is needed where
+ we know the underlying performance and can observe actual team performance.
+ For this we generate test data.
+ Each of 30 teams is assigned an underlying performance (mean tech foul
+ rate per game) and a competition is simulated where the tech fouls for
+ each team are generated by a random number generator with a mean value
+ equal to the underlying performance.
+ The rounds of the competition are as run in the 2018 Southern Cross competition
+ qualifying rounds, which was 30 teams and 65 matches of 2 alliances per
+ match and 3 teams per alliance.
+ Since the opposing alliance is not relevant for this analysis, the data
+ can be treated as 130 rounds of 3 teams each.
+ 
+\end_layout
+
+\begin_layout Section
+Boostrapping
+\end_layout
+
+\begin_layout Standard
+Running each method against one data set gives a certain answer, but one
+ might be left wondering what would have happened if the data was a little
+ bit different - each match is, after all, a random sample of each teams
+ 
+\begin_inset Quotes eld
+\end_inset
+
+true
+\begin_inset Quotes erd
+\end_inset
+
+ ability and sometimes random chance falls a long way from the mean.
+ 
+\begin_inset Quotes eld
+\end_inset
+
+Bootstrapping
+\begin_inset Quotes erd
+\end_inset
+
+ is a process that helps to estimate the sensitivity of the results to these
+ random effects.
+ Ideally, if it were possible to observe the true ability of each team and
+ the random distribution that generates how each team performs on the day,
+ the experiments could be run repeatedly and the distribution of results
+ would show how much the estimates vary due to the random nature of the
+ data.
+ In reality we can not observe the random distribution that generates the
+ data, but we do have one sample of it - the data itself.
+ So by taking samples (with replacement) of the data available, we can create
+ an approximation to the random distribution that generates the data.
+ Using this approach, it is possible to generate the mean expected results
+ and the range (e.g.
+ the 10% to 90% percentile range) that the results lie in.
+\end_layout
+
+\begin_layout Section
+Test Results
+\end_layout
+
+\begin_layout Standard
+The first step is to verify that all of the methods are working correctly
+ (that is, there are no programming errors and the results are consistent
+ with theory).
+ To do this we provide the methods with a large amount of data and show
+ that the results have a small error compared to the expected values.
+ The second step is to try the methods with the data available in a single
+ competition to see how the error compares to when there is a large amount
+ of data.
+ To this end the three methods were tested using synthetic data comprising:
+\end_layout
+
+\begin_layout Itemize
+500 competitions (130 rounds 
+\begin_inset Formula $\times$
+\end_inset
+
+ 500 competitions)
+\end_layout
+
+\begin_layout Itemize
+1 competition (130 rounds)
+\end_layout
+
+\begin_layout Standard
+For the three methods and two data sets, the resulting estimation errors
+ (sum of squared error, SSE) are shown in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "tab:Sum-of-Squared"
+
+\end_inset
+
+.
+ The SSE against the underlying mean (the mean of the distribution used
+ to generate the data) and the data mean (the mean of the bootstrapped values)
+ are shown; the SSE against the underlying mean indicates the usefulness
+ of the algorithm for predicting the teams true performance, and the SSE
+ against the data mean indicates usefulness for predicting performance on
+ the day of competition.
+ For large amounts of data, the errors are relatively small for all methods
+ but LS has the lowest error.
+ For the small data set, LS is the worst and ML the best.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="5" columns="5">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+SSE
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Underlying Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Data Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+500
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+500
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method 1 (Maximum Likelihood)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.0028
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.247
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.0025
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.399
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method 2 (Least Squares)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.0015
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.912
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.0014
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.621
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method 3 (MAP)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.0023
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.251
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.0019
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.429
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Sum of Squared Errors (SSE) for each method for each experiment
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:Sum-of-Squared"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Figures 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Maximum-Likelihood-estimate"
+
+\end_inset
+
+ to 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:MAP-estimate-on"
+
+\end_inset
+
+ show, for each team, the mean estimated foul rate (dots) and the 10% to
+ 90% range of estimated values for each, compared to the actual values used
+ to create the synthetic data (red crosses), for the large data set.
+\end_layout
+
+\begin_layout Standard
+Figures 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Maximum-Likelihood-estimate-1"
+
+\end_inset
+
+ to 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:MAP-estimate-on-1"
+
+\end_inset
+
+ show the same for the small data set.
+ Clearly, for the small data set, the algorithms are unable to accurately
+ recover the underlying rates as shown by the red crosses.
+ The average of the actual samples of tech foul values generated for each
+ team are shown as red dots; it can be seen that many are zero, so very
+ little data is actually available to the estimators.
+ The lack of data shows up weaknesses in the estimators; for LS, the credible
+ intervals are about twice as large as for the other two methods, and frequently
+ stretch into the infeasible negative region; the MAP estimates deviate
+ very little from their initial values since the algorithm relies on its
+ prior knowledge in the face of little data.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename maximum_likelihood.png
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Maximum Likelihood estimate on synthetic data (
+\begin_inset Formula $500\times$
+\end_inset
+
+ competition data set).
+ Estimates are blue dots, underlying means are red crosses, and actual data
+ are red dots.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Maximum-Likelihood-estimate"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename least_squares.png
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Least Squares estimate on synthetic data (
+\begin_inset Formula $500\times$
+\end_inset
+
+ competition data set).
+ Estimates are green dots, underlying means are red crosses, and actual
+ data are red dots 
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Least-Squares-estimate"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename map.png
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+MAP estimate on synthetic data (
+\begin_inset Formula $500\times$
+\end_inset
+
+ competition data set).
+ Estimates are light green dots, underlying means are red crosses, and actual
+ data are red dots
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:MAP-estimate-on"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename maximum_likelihood1.png
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Maximum Likelihood estimate on synthetic data (single competition data set).
+ Estimates are blue dots, underlying means are red crosses, and actual data
+ are red dots
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Maximum-Likelihood-estimate-1"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename least_squares1.png
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Least Squares estimate on synthetic data (single competition data set)
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Least-Squares-estimate-1"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename map1.png
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+MAP estimate on synthetic data (single competition data set).
+ Estimates are light green dots, underlying means are red crosses, and actual
+ data are red dots
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:MAP-estimate-on-1"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Table 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "tab:Spearman"
+
+\end_inset
+
+ shows the Spearman ranking coefficients for the same experiments.
+ The Spearman ranking coefficient is an indicator of the relative ordering
+ of two data sets regardless of their actual values.
+ Two sets which have values that are ordered the same have a coefficient
+ of 1, if ordered in exactly the opposite order the coefficient is -1, and
+ if there is no correlation in the ordering the value will be 0.
+ From the table, LS gives the best performance for low data and good performance
+ in all cases; however, the coefficients are quite small in the low data
+ case, so whilst LS is the best estimator it is still not particularly accurate.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="5" columns="5">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Spearman
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Underlying Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Data Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+500
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+500
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method 1 (Maximum Likelihood)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.991
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.270
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.989
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.358
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method 2 (Least Squares)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.992
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.286
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.987
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.424
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Method 3 (MAP)
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+0.993
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.160
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.993
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.341
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Spearman Ranking Coefficient for each method for each experiment
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:Spearman"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The above results were conducted with one data set and therefore may have
+ reflected the performance of the estimates just on that one data set.
+ However, by repeating the same experiments 100 times (on the 1
+\begin_inset Formula $\times$
+\end_inset
+
+ competition set), it was confirmed that ML most consistently provided the
+ best estimate in terms of smallest error, and LS provided the best estimate
+ in terms of rank ordering (
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "tab:Algorithms-wins-on"
+
+\end_inset
+
+).
+ 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "tab:Performance-over-repeated"
+
+\end_inset
+
+ summarises the estimates, showing median values and the 10% to 90% percentiles
+ of the estimates over the 100 repeated tests.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="5" columns="5">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<row>
+<cell multirow="3" alignment="center" valignment="middle" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Wins 1
+\begin_inset Formula $\times$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+SSE
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Spearman
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell multirow="4" alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Underlying Means
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Data Means
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Underlying Means
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+vs.
+ Data Means
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+ML
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+89
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+51
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+19
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+9
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+LS
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+46
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+77
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+87
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+MAP
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+10
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+7
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+4
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Algorithms wins on SSE and Spearman over repeated tests
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:Algorithms-wins-on"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float table
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="5" columns="10">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<row>
+<cell multirow="3" alignment="center" valignment="middle" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+SSE
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+vs.
+ Underlying Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+vs.
+ Data Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell multirow="3" alignment="center" valignment="middle" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Spearman
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+vs.
+ Underlying Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="1" alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+vs.
+ Data Mean
+\end_layout
+
+\end_inset
+</cell>
+<cell multicolumn="2" alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell multirow="4" alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Median
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Range
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Median
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Range
+\end_layout
+
+\end_inset
+</cell>
+<cell multirow="4" alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Median
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Range
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Median
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+Range
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+ML
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.26
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.15 - 0.41
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.51
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.29 - 0.82
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+ML
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.28
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.04 - 0.5
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.40
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.19 - 0.63
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+LS
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.77
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.47 - 1.12
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.54
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.31 - 0.85
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+LS
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.44
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.23 - 0.61
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.60
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.46 - 0.73
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+MAP
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.29
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.17 - 0.46
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.56
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.31 - 0.88
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+MAP
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.05
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+-0.21 - 0.32
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.095
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\size footnotesize
+0.16 - 0.35
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Performance over repeated tests
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:Performance-over-repeated"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Actual Results
+\end_layout
+
+\begin_layout Standard
+Table 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "tab:actual-results"
+
+\end_inset
+
+ shows the actual results for the FRC 2018 Southern Cross competition, with
+ values for all methods but shown ranked by LS.
+ There does not appear to be any particular correlation between the teams
+ foul ranking and their final position in the competition.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+include{results}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:actual-results"
+
+\end_inset
+
+Actual per team foul estimation results, shown ranked according to the LS
+ method (lowest number of fouls first)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Conclusion
+\end_layout
+
+\begin_layout Standard
+Having data for a single competition as the basis for estimating per-team
+ statistics is a limitation, particular for tech fouls where the data is
+ sparse.
+ Nevertheless, the methods shown demonstrate some correlation between estimates
+ and actual, and therefore provide some guidance - at least, a level of
+ guidance which is better than none at all.
+ The LS (least squares) method proved to be the most versatile for generating
+ rankings in tech foul order, although ML (maximum likelihood) was better
+ at estimating actual numbers of tech fouls.
+\end_layout
+
+\begin_layout Section
+\start_of_appendix
+Method 1 (Maximum Likelihood, ML)
+\end_layout
+
+\begin_layout Standard
+The first method has a sound theoretical foundation, but requires maximisation
+ of a likelihood function so is slightly more complicated to implement.
+\end_layout
+
+\begin_layout Standard
+Suppose that each team produces fouls at an average rate which is constant
+ for that team and independent of all other teams.
+ Thus the 
+\begin_inset Formula $i$
+\end_inset
+
+th team produces an average of 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+ fouls per round.
+ The actual number produced must be an integer.
+ The probability of team 
+\begin_inset Formula $i$
+\end_inset
+
+ with mean foul rate 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+ producing 
+\begin_inset Formula $k_{ij}$
+\end_inset
+
+ fouls in round 
+\begin_inset Formula $j$
+\end_inset
+
+ is described by a Poisson probability distribution,
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+P(k_{ij})=\frac{\lambda_{i}^{k_{ij}}}{k_{ij}!}e^{-\lambda_{i}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+However, 
+\begin_inset Formula $k_{ij}$
+\end_inset
+
+ is not observed directly.
+ Instead, the combination of the tech fouls of the three teams in the alliance
+ is observed.
+ Let the observed fouls in round 
+\begin_inset Formula $j$
+\end_inset
+
+ be 
+\begin_inset Formula $F_{j}$
+\end_inset
+
+.
+ The winner and red/blue alliance association is irrelevant to the number
+ of tech fouls so for simplicity, let 
+\begin_inset Formula $j$
+\end_inset
+
+ run from 1 to 
+\begin_inset Formula $J$
+\end_inset
+
+ where 
+\begin_inset Formula $J$
+\end_inset
+
+ is double the number of actual rounds, and red alliance and blue alliance
+ data are treated separately as one round each.
+ So for round 
+\begin_inset Formula $j$
+\end_inset
+
+ the sum of tech fouls across the alliance members can be written as:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\sum_{i\in A_{j}}k_{ij}=F_{j}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+where the notation 
+\begin_inset Formula $i\in A_{j}$
+\end_inset
+
+ means to select just the teams which are members of the alliance for round
+ 
+\begin_inset Formula $j$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The sum of independent Poisson distributed variables is also Poisson distributed
+ with a mean which is the sum of the means of the contributors.
+ i.e.
+ given 
+\begin_inset Formula $k_{1}\sim Poisson(\lambda_{1})$
+\end_inset
+
+ and 
+\begin_inset Formula $k_{2}\sim Poisson(\lambda_{2})$
+\end_inset
+
+, then 
+\begin_inset Formula $k_{1}+k_{2}\sim Poisson(\lambda_{1}+\lambda_{2})$
+\end_inset
+
+.
+ Thus for an alliance round 
+\begin_inset Formula $F_{j}\sim Poisson(\sum_{i\in A_{j}}\lambda_{i})$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+To work out the most likely value for all of the 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+, we write down the probability of observing all of the 
+\begin_inset Formula $F_{j}$
+\end_inset
+
+ that occurred in the match play, and then find the values for 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+ that maximise it (or the log probability).
+\end_layout
+
+\begin_layout Standard
+Since we assume that all of the rounds are independent, the probability
+ of observing 
+\begin_inset Formula $F_{1}$
+\end_inset
+
+and 
+\begin_inset Formula $F_{2}$
+\end_inset
+
+ and so on, is the product of the individual probabilities:
+\begin_inset Formula 
+\begin{align*}
+P(F_{1},F_{2},...,F_{J}) & =\prod_{j=1}^{J}P(F_{j})\\
+ & =\prod_{j=1}^{J}\frac{\left(\sum_{i\in A_{j}}\lambda_{i}\right)^{F_{j}}}{F_{j}!}e^{-\sum_{i\in A_{j}}\lambda_{i}}
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The log probability is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\log P(F_{1},F_{2}...,F_{J})=\sum_{j=1}^{J}\left(F_{j}\log\sum_{i\in A_{j}}\lambda_{i}-\log F_{j}!-\sum_{i\in A_{j}}\lambda_{i}\right)\label{eq:ML}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+To find the maximum, differentiate with respect to each of the 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+ and equate to 0:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\frac{d\log P}{d\lambda_{m}}=\sum_{j:m\in A_{j}}\left(\frac{F_{j}}{\sum_{i\in A_{j}}\lambda_{i}}-1\right)\label{eq:MLderiv}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Here the sum is over all rounds in which team 
+\begin_inset Formula $m$
+\end_inset
+
+ participated.
+ The above leads to 
+\begin_inset Formula $M$
+\end_inset
+
+ equations (
+\begin_inset Formula $M$
+\end_inset
+
+=number of teams) in 
+\begin_inset Formula $M$
+\end_inset
+
+ unknowns.
+ However, they are non-linear and therefore it may be easier to maximise
+ the log probability function directly.
+ The derivative can be utilised to speed up convergence of the maximiser.
+\end_layout
+
+\begin_layout Standard
+To calculate the log probability, the term 
+\begin_inset Formula $\sum_{i\in A_{j}}\lambda_{i}$
+\end_inset
+
+ must be calculated.
+ If the 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+ are stored in a vector 
+\begin_inset Formula $\Lambda$
+\end_inset
+
+ and the alliance data stored in an 
+\begin_inset Formula $J\times M$
+\end_inset
+
+ indicator matrix 
+\begin_inset Formula $X$
+\end_inset
+
+ as follows:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\Lambda=\left[\lambda_{1},\lambda_{2},\dots,\lambda_{M}\right]^{T}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+X=\left[\begin{array}{cccccccccc}
+1 & 1 & 1\\
+ &  &  & 1 & 1 & 1\\
+ &  &  &  &  &  & ...\\
+ &  &  &  &  &  &  & ...\\
+\\
+\end{array}\right]
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The columns of 
+\begin_inset Formula $X$
+\end_inset
+
+ correspond to a team and rows to a round.
+ Thus a 1 appears in row 
+\begin_inset Formula $j$
+\end_inset
+
+ and column 
+\begin_inset Formula $i$
+\end_inset
+
+ if team 
+\begin_inset Formula $i$
+\end_inset
+
+ participated in round 
+\begin_inset Formula $j$
+\end_inset
+
+.
+ Then the vector 
+\begin_inset Formula $X\Lambda$
+\end_inset
+
+ is the vector of 
+\begin_inset Formula $\sum_{i\in A_{j}}\lambda_{i}$
+\end_inset
+
+ for 
+\begin_inset Formula $j=1\dots J$
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+Hence 
+\begin_inset Formula $\log P$
+\end_inset
+
+ can be readily calculated given 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+ (ignoring the 
+\begin_inset Formula $\log F_{j}!$
+\end_inset
+
+ term which does not affect the location of the maximum).
+\end_layout
+
+\begin_layout Section
+Method 2 (Least Squares, LS)
+\end_layout
+
+\begin_layout Standard
+Method 2 is more straightforward, but because it does not assume a model
+ for the observations like Method 1, it is possible for it to yield negative
+ results.
+\end_layout
+
+\begin_layout Standard
+In this case, each round is modelled as:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\sum_{i\in A_{j}}\lambda_{i}+e_{j}=F_{j}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+That is, the number of tech fouls per round is the sum of the means of each
+ team plus a random error term.
+ The objective is to find the 
+\begin_inset Formula $\lambda_{i}$
+\end_inset
+
+ which minimise the mean squared value of the error term.
+\end_layout
+
+\begin_layout Standard
+Using the same matrix notation as the previous section, this can be written
+ in matrix form as:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+X\Lambda+E=F
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+where 
+\begin_inset Formula $E$
+\end_inset
+
+ the vector of error terms and 
+\begin_inset Formula $F$
+\end_inset
+
+ the vector of 
+\begin_inset Formula $F_{j}$
+\end_inset
+
+ of length 
+\begin_inset Formula $J$
+\end_inset
+
+.
+ This is a well-known least-squares problem which has solution:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+\Lambda=(X^{T}X)^{-1}X^{T}F
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Method 3 (Maximum A-Posteriori, MAP)
+\end_layout
+
+\begin_layout Standard
+In method 2, it was noted that it is possible for the foul rates to be negative.
+ This highlights an issue; that we have prior knowledge of some of the character
+istics of the rates - e.g.
+ that they must be positive and that the average rate should be near the
+ overall average across all rounds - but neither of the previous methods
+ allowed this information to be incorporated into the model.
+ Method 1 maximised the likelihood of the observations 
+\begin_inset Formula $F_{j}$
+\end_inset
+
+; this method extends on Method 1 but instead maximises the probability
+ of the estimates of the 
+\begin_inset Formula $\lambda_{m}$
+\end_inset
+
+ using our prior knowledge.
+ Method 1 is known as Maximum Likelihood (ML) and Method 3 is known as Maximum
+ A-Posteriori (MAP) because it maximises the posterior likelihood, or the
+ likelihood that is the combination of prior knowledge with what we learn
+ after observing data.
+\end_layout
+
+\begin_layout Standard
+Thus we wish to maximise 
+\begin_inset Formula $P(\lambda_{1,}\lambda_{2},\dots\lambda_{M}|F_{1},F_{2},\dots F_{J})$
+\end_inset
+
+ which we write as 
+\begin_inset Formula $P(\Lambda|F)$
+\end_inset
+
+.
+ We capture our prior knowledge of where we think 
+\begin_inset Formula $\lambda_{m}$
+\end_inset
+
+ should like by crafting another probability distribution for it; a convenient
+ choice is to use a Gamma distribution with parameters 
+\begin_inset Formula $\alpha$
+\end_inset
+
+ and 
+\begin_inset Formula $\beta$
+\end_inset
+
+, and choosing the parameters so that the Gamma distribution has the characteris
+tics we expect.
+ Using Bayes' Rule:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+P(\Lambda|F)=\frac{P(F|\Lambda)P(\Lambda|\alpha,\beta)}{\int P(F|\Lambda)P(\Lambda|\alpha,\beta)d\Lambda}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Maximising the log probability is the same as maximising the log of the
+ numerator since the denominator is fixed (after integration, it is no longer
+ a function of 
+\begin_inset Formula $\Lambda$
+\end_inset
+
+).
+ 
+\begin_inset Formula $\log P(F|\Lambda)$
+\end_inset
+
+ is as given in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "eq:ML"
+
+\end_inset
+
+.
+ The second term is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{align}
+\log P(\Lambda|\alpha,\beta) & =\sum_{m=1}^{M}\log P(\lambda_{m}|\alpha,\beta)\label{eq:logprior}
+\end{align}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+where 
+\begin_inset Formula $P(\lambda_{m}|\alpha,\beta)$
+\end_inset
+
+ is the Gamma PDF evaluated at 
+\begin_inset Formula $\lambda_{m}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+Thus the log probability to maximise is the sum of equations 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:ML"
+
+\end_inset
+
+ and 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:logprior"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The derivative of the prior is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\frac{d\log P(\Lambda|\alpha,\beta)}{d\lambda_{m}}=\frac{\alpha-1}{\lambda_{m}}-\beta\label{eq:logpriorderiv}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+and the overall derivative is the sum of equations 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:MLderiv"
+
+\end_inset
+
+ and 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:logpriorderiv"
+
+\end_inset
+
+.
+\end_layout
+
+\end_body
+\end_document
